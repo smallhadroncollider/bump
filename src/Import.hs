@@ -1,8 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 module Import
-  ( module RIO
-  , module Types
-  ) where
+    ( module RIO
+    , module Bump.Types.App
+    , module Bump.Types.Options
+    ) where
 
 import RIO
-import Types
+
+import Bump.Types.App
+import Bump.Types.Options

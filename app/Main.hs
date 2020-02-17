@@ -1,32 +1,30 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Main (main) where
 
-import Import
-import Run
+module Main
+    ( main
+    ) where
+
+import RIO
 import RIO.Process
+
 import Options.Applicative.Simple
-import qualified Paths_bump
+
+import Bump       (run)
+import Import
+import Paths_bump (version)
 
 main :: IO ()
 main = do
-  (options, ()) <- simpleOptions
-    $(simpleVersion Paths_bump.version)
-    "Header for command line arguments"
-    "Program description, also for command line arguments"
-    (Options
-       <$> switch ( long "verbose"
-                 <> short 'v'
-                 <> help "Verbose output?"
-                  )
-    )
-    empty
-  lo <- logOptionsHandle stderr (optionsVerbose options)
-  pc <- mkDefaultProcessContext
-  withLogFunc lo $ \lf ->
-    let app = App
-          { appLogFunc = lf
-          , appProcessContext = pc
-          , appOptions = options
-          }
-     in runRIO app run
+    (options, ()) <-
+        simpleOptions
+            $(simpleVersion version)
+            "bump"
+            "Simple version bumping"
+            (Options <$> switch (long "verbose" <> short 'v' <> help "Verbose output?") <*>
+             argument auto (metavar "[major|minor|patch]"))
+            empty
+    lo <- logOptionsHandle stderr (optionsVerbose options)
+    pc <- mkDefaultProcessContext
+    withLogFunc lo $ \lf ->
+        let app = App {appLogFunc = lf, appProcessContext = pc, appOptions = options}
+        in runRIO app run
