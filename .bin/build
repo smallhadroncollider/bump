@@ -1,0 +1,99 @@
+# stop on any errors
+set -e
+
+workDir=".stack-build"
+branch=$(git rev-parse --abbrev-ref HEAD)
+
+if [ $branch != "master" ]; then
+    echo "\033[0;31mMust be on master branch\033[0m"
+    exit
+fi
+
+if [ ! -d "$workDir" ]; then
+    echo "\033[0;31mMust be run in project root\033[0m"
+    exit
+fi
+
+if [ -z "$1" ]; then
+    echo "\033[0;31mVersion number required\033[0m"
+    exit
+fi
+
+# stash any changes
+git stash
+
+# check cabal build works
+cabal build
+
+if [ $? -ne 0 ]
+then
+    git stash pop
+    echo "\033[0;31mCabal build failed\033[0m"
+    exit
+fi
+
+# make sure latest changes pushed to github
+git push --all && git push --tags
+
+# clean out previous build attempts
+rm -rf "$workDir/install"
+
+# sort out releases directory
+rm -rf "releases/$1/bump"
+mkdir -p "releases/$1/bump"
+
+# Mac
+stack build --work-dir "$workDir" --ghc-options -O3
+
+strip "$(stack path --local-install-root --work-dir $workDir)/bin/bump" # remove tokens
+
+tar -czvf "releases/$1/bump-$1_x86-64-mac.tar.gz" --directory="$(stack path --local-install-root --work-dir $workDir)/bin" "bump"
+
+
+# Linux
+stack docker pull
+stack build --work-dir "$workDir" --docker --ghc-options -O3
+
+LINUX_FULL_PATH=$(find "$workDir" -path "*linux*" -and -path "*bin/bump")
+LINUX_PATH=${LINUX_FULL_PATH%"bump"}
+
+tar -czvf "releases/$1/bump-$1_x86-64-linux.tar.gz"  --directory="$LINUX_PATH" "bump"
+
+mkdir -p "releases/$1/bump/DEBIAN"
+mkdir -p "releases/$1/bump/usr/local/bin"
+
+cp "$LINUX_PATH/bump" "releases/$1/bump/usr/local/bin"
+
+echo "Package: bump
+Version: $1
+Maintainer: Mark Wales
+Architecture: amd64
+Description: A command line task manager written in Haskell" > "releases/$1/bump/DEBIAN/control"
+
+docker run -v "$PWD/releases/$1":/usr/src/app -w /usr/src/app debian dpkg-deb --build bump
+
+mv "releases/$1/bump.deb" "releases/$1/bump-$1_x86-64-linux.deb"
+
+# Release Template
+rm -rf "releases/$1/bump"
+
+open "releases/$1"
+open "https://github.com/smallhadroncollider/bump/releases/new"
+
+echo "
+-
+
+### Installation
+
+- Mac/Linux: download binary and place it in a directory in your \`\$PATH\` (e.g. \`/usr/local/bin\`)
+- Debian (including Ubuntu): download the \`.deb\` file and run \`dpkg -i bump-$1_x86-64-linux.deb\`. You may also need to install the \`libtinfo5\` package (\`sudo apt install libtinfo5\`)
+- Fedora: Run \`sudo dnf install ncurses-compat-libs\` then download and run binary as described above" | pbcopy
+
+echo "Release info copied to clipboard"
+
+# add to Hackage
+stack upload .
+
+
+# unstash
+git stash pop

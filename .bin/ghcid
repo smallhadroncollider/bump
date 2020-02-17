@@ -1,0 +1,1 @@
+~/.local/bin/ghcid --command "stack ghci bump:lib bump:test:bump-test --ghci-options=-fobject-code" --test "main"

@@ -1,0 +1,3 @@
+# bump
+
+Automatic version bumping
