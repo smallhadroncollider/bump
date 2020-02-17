@@ -41,6 +41,7 @@ ghc-options:
 library:
   source-dirs: src
   dependencies:
+    - attoparsec
     - optparse-applicative
 
 executables:
@@ -62,6 +63,7 @@ tests:
     source-dirs:         test
     dependencies:
     - bump
+    - file-embed
     - tasty
     - tasty-discover
     - tasty-expected-failure
